@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   checks:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: System packages (WebKitGTK for the Tauri crate)
@@ -46,15 +46,18 @@ jobs:
         working-directory: frontend
       - name: Pandoc sidecar (pinned 3.9, checksum-verified)
         run: scripts/fetch-pandoc.sh x86_64-unknown-linux-gnu
+      - name: EPUBCheck (pinned, checksum-verified; the tests validate the books they build)
+        run: |
+          scripts/fetch-epubcheck.sh
+          echo "$PWD/tools/epubcheck" >> "$GITHUB_PATH"
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
+      # The build test finds the sidecar in src-tauri/binaries by itself.
       - run: cargo test --workspace
-        env:
-          WW_PANDOC: src-tauri/binaries/ww-pandoc-x86_64-unknown-linux-gnu
 
   audit:
     # Known vulnerabilities in Rust crates (RustSec) and npm packages.
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable

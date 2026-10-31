@@ -25,6 +25,9 @@ läsplattor och bokhandlar.
   så du kan öppna den igen och bygga om när texterna ändrats.
 - **Skapa EPUB …** bygger boken. Egna anteckningar och kommentarer i texterna
   följer aldrig med; fotnoter gör det.
+- **Validering.** Har du [EPUBCheck](https://www.w3.org/publishing/epubcheck/)
+  installerat (på Mac: `brew install epubcheck`) kontrolleras boken mot
+  EPUB-standarden direkt efter bygget, och eventuella fel visas.
 
 Formatet på texterna beskrivs i [word-work-markdown](https://github.com/WordWorkers/WordWorkMarkdown).
 

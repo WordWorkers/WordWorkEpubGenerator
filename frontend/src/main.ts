@@ -104,6 +104,7 @@ app.innerHTML = `
   <footer>
     <button id="build" class="primary">Skapa EPUB …</button>
     <span id="status" role="status"></span>
+    <ul id="problems" class="muted"></ul>
   </footer>
 `;
 
@@ -273,14 +274,23 @@ document.getElementById("build")!.addEventListener("click", () =>
     if (!chapters.length) return say("Lägg till minst ett kapitel först.", true);
     say("Skapar EPUB …");
     const coverPng = book["cover-style"] ? Array.from(await rasterize(coverSvg())) : null;
-    const out = await invoke<string | null>("epub_build", { book, coverPng });
-    if (!out) return say("");
+    const built = await invoke<{ path: string; validation: { ok: boolean; messages: string[] } | null } | null>("epub_build", {
+      book,
+      coverPng,
+    });
+    if (!built) return say("");
+    const v = built.validation;
+    const verdict = !v ? "" : v.ok ? " · Giltig EPUB" : ` · EPUBCheck hittade ${v.messages.length} problem`;
     status.textContent = "";
-    status.append(`Boken är klar: ${out.split("/").pop()} `);
+    status.append(`Boken är klar: ${built.path.split("/").pop()}${verdict} `);
     const show = Object.assign(document.createElement("button"), { textContent: "Visa i mappen", className: "link" });
-    show.addEventListener("click", () => run(() => invoke("reveal", { path: out })));
+    show.addEventListener("click", () => run(() => invoke("reveal", { path: built.path })));
     status.append(show);
-    status.classList.remove("error");
+    status.classList.toggle("error", v !== null && !v.ok);
+    const problems = document.getElementById("problems")!;
+    problems.innerHTML = "";
+    if (!v) problems.append(Object.assign(document.createElement("li"), { textContent: "Installera EPUBCheck för att få boken validerad mot EPUB-standarden." }));
+    for (const m of v?.messages ?? []) problems.append(Object.assign(document.createElement("li"), { textContent: m }));
   }),
 );
 

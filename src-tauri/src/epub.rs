@@ -4,6 +4,8 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+use serde::Serialize;
+
 use crate::book::{Book, Kind};
 use crate::markdown::{
     frontmatter_field, frontmatter_title, prefix_footnotes, split_frontmatter, starts_with_heading, strip_private,
@@ -92,6 +94,46 @@ pub fn build(pandoc: &Path, book: &Book, cover: Option<&Path>, out: &Path) -> Re
     std::fs::rename(&tmp, out).map_err(|e| format!("Kan inte spara {}: {e}", out.display()))
 }
 
+/// Result of running EPUBCheck on a finished book.
+#[derive(Debug, Serialize)]
+pub struct Validation {
+    /// No errors (warnings may remain in `messages`).
+    pub ok: bool,
+    pub messages: Vec<String>,
+}
+
+/// Runs EPUBCheck if it is installed; `None` when it is not.
+pub fn validate(epub: &Path) -> Option<Validation> {
+    let checker = epubcheck_path()?;
+    let output = Command::new(&checker).arg(epub).env("LC_ALL", UTF8_LOCALE).output().ok()?;
+    let text = format!("{}{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+    let messages = text
+        .lines()
+        .filter(|l| ["FATAL(", "ERROR(", "WARNING("].iter().any(|p| l.starts_with(p)))
+        .map(|l| l.trim().to_string())
+        .collect();
+    Some(Validation { ok: output.status.success(), messages })
+}
+
+/// `WW_EPUBCHECK` (debug builds), else `epubcheck` on PATH or where Homebrew
+/// and Linux packages put it. GUI apps on macOS get a short PATH, hence the list.
+fn epubcheck_path() -> Option<PathBuf> {
+    if cfg!(debug_assertions) {
+        if let Ok(p) = std::env::var("WW_EPUBCHECK") {
+            return Some(p.into());
+        }
+    }
+    let name = if cfg!(windows) { "epubcheck.cmd" } else { "epubcheck" };
+    let known = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"].map(PathBuf::from);
+    std::env::var_os("PATH")
+        .map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
+        .unwrap_or_default()
+        .into_iter()
+        .chain(known)
+        .map(|dir| dir.join(name))
+        .find(|p| p.is_file())
+}
+
 /// The bundled Pandoc next to the app executable; `WW_PANDOC` overrides in
 /// debug builds; PATH is the last resort.
 pub fn pandoc_path() -> PathBuf {
@@ -147,11 +189,19 @@ mod tests {
             chapters: vec![k1.display().to_string(), k2.display().to_string()],
             ..Default::default()
         };
-        let out = dir.join("bok.epub");
-        build(&pandoc, &book, None, &out).unwrap();
-        let bytes = std::fs::read(&out).unwrap();
-        assert_eq!(&bytes[..2], b"PK");
-        assert!(bytes.windows(8).any(|w| w == b"mimetype"));
+        for kind in [Kind::Novel, Kind::Story, Kind::Collection] {
+            let book = Book { kind, ..book.clone() };
+            let out = dir.join("bok.epub");
+            build(&pandoc, &book, None, &out).unwrap();
+            let bytes = std::fs::read(&out).unwrap();
+            assert_eq!(&bytes[..2], b"PK");
+            assert!(bytes.windows(8).any(|w| w == b"mimetype"));
+            // Against the EPUB standard, when EPUBCheck is installed.
+            match validate(&out) {
+                Some(v) => assert!(v.ok, "{kind:?}: {:#?}", v.messages),
+                None => eprintln!("no epubcheck, skipping validation"),
+            }
+        }
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

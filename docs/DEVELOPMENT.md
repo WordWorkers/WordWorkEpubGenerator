@@ -23,6 +23,15 @@ cargo tauri build
 
 `WW_PANDOC=/path/to/pandoc` overrides the sidecar in debug builds.
 
+## Validation
+
+After a build the app runs [EPUBCheck](https://github.com/w3c/epubcheck) if
+`epubcheck` is on PATH or in the usual Homebrew and Linux locations, and shows
+the result. `scripts/fetch-epubcheck.sh` installs a pinned copy under
+`tools/epubcheck/` (needs Java); put that folder on PATH, or set
+`WW_EPUBCHECK=/path/to/epubcheck` in debug builds. The build test validates
+every book kind when a checker is found, and CI always has one.
+
 ## Book file
 
 ```yaml

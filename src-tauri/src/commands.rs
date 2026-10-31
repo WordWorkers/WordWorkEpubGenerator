@@ -24,6 +24,13 @@ pub struct ChapterInfo {
 }
 
 #[derive(Serialize)]
+pub struct Built {
+    path: String,
+    /// `None` when EPUBCheck is not installed.
+    validation: Option<epub::Validation>,
+}
+
+#[derive(Serialize)]
 pub struct Opened {
     path: String,
     book: Book,
@@ -105,10 +112,11 @@ pub async fn cover_pick(app: AppHandle) -> Result<Option<String>> {
     Ok(to_path(blocking(move || d.blocking_pick_file()).await?)?.map(|p| p.display().to_string()))
 }
 
-/// Asks where to save, then builds. `cover_png` is a cover generated in the
-/// window; without it the book's own cover image is used. Returns the EPUB path.
+/// Asks where to save, builds, and validates with EPUBCheck when available.
+/// `cover_png` is a cover generated in the window; without it the book's own
+/// cover image is used.
 #[tauri::command]
-pub async fn epub_build(app: AppHandle, book: Book, cover_png: Option<Vec<u8>>) -> Result<Option<String>> {
+pub async fn epub_build(app: AppHandle, book: Book, cover_png: Option<Vec<u8>>) -> Result<Option<Built>> {
     let name = if book.title.is_empty() { "bok".to_string() } else { book.title.clone() };
     let d = dialog(&app, "Spara EPUB").set_file_name(format!("{name}.epub")).add_filter("EPUB", &["epub"]);
     let Some(out) = to_path(blocking(move || d.blocking_save_file()).await?)? else { return Ok(None) };
@@ -121,7 +129,8 @@ pub async fn epub_build(app: AppHandle, book: Book, cover_png: Option<Vec<u8>>) 
             .transpose()?;
         let cover =
             generated.as_deref().or_else(|| (!book.cover_image.is_empty()).then(|| Path::new(&book.cover_image)));
-        let r = epub::build(&epub::pandoc_path(), &book, cover, &out).map(|_| out.display().to_string());
+        let r = epub::build(&epub::pandoc_path(), &book, cover, &out)
+            .map(|_| Built { validation: epub::validate(&out), path: out.display().to_string() });
         if let Some(p) = generated {
             let _ = std::fs::remove_file(p);
         }
