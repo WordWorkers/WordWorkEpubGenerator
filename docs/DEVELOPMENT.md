@@ -42,3 +42,13 @@ to Pandoc as `-M`.
 Paths are relative to the book file. `cover-style` (one of the ids in `STYLES`
 in `frontend/src/cover.ts`) selects a built-in cover: `frontend/src/cover.ts` draws it as SVG,
 the window rasterizes it to PNG and sends the bytes with the build request.
+
+## CI and releases
+
+`ci.yml` runs on every push and pull request: formatting, clippy, tests with
+the real Pandoc sidecar, frontend typecheck and build, and dependency audits.
+`build.yml` builds installers for macOS (both architectures), Windows and
+Linux on pull requests and on tags; a `v*` tag also drafts a GitHub release
+with the installers, `SHA256SUMS` and `docs/RELEASE_NOTES.md` as body.
+macOS builds are signed and notarized when the `APPLE_*` secrets exist,
+otherwise ad-hoc signed.

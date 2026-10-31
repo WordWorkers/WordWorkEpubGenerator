@@ -26,7 +26,7 @@ läsplattor och bokhandlar.
 - **Skapa EPUB …** bygger boken. Egna anteckningar och kommentarer i texterna
   följer aldrig med; fotnoter gör det.
 
-Formatet på texterna beskrivs i [word-work-markdown](../word-work-markdown).
+Formatet på texterna beskrivs i [word-work-markdown](https://github.com/WordWorkers/WordWorkMarkdown).
 
 ## Utveckling
 
